@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RansomGuard — Early Warning System</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-void: #020408;
+    --bg-panel: #080f18;
+    --bg-card: #0c1825;
+    --bg-card2: #0f1f30;
+    --border: #1a3a5c;
+    --border-glow: #0d6efd44;
+    --accent-blue: #00c8ff;
+    --accent-cyan: #00ffd5;
+    --accent-green: #00ff9d;
+    --accent-amber: #ffb800;
+    --accent-red: #ff2d5b;
+    --accent-purple: #b86bff;
+    --text-primary: #e8f4ff;
+    --text-secondary: #7aa8d0;
+    --text-muted: #3d6a8a;
+    --critical: #ff2d5b;
+    --high: #ff7c2b;
+    --medium: #ffb800;
+    --low: #00ff9d;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-ui: 'Rajdhani', sans-serif;
+    --font-display: 'Exo 2', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,200,255,0.015) 2px, rgba(0,200,255,0.015) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 240px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+  }
+
+  .logo {
+    padding: 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    margin-bottom: 10px;
+    box-shadow: 0 0 20px rgba(0,200,255,0.4);
+  }
+
+  .logo-text {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent-blue);
+    letter-spacing: 1px;
+  }
+
+  .logo-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 3px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+  }
+
+  .threat-level {
+    margin: 16px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255, 45, 91, 0.1);
+    border: 1px solid rgba(255, 45, 91, 0.3);
+  }
+
+  .threat-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .threat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-red);
+    font-family: var(--font-display);
+    animation: pulse-red 2s infinite;
+  }
+
+  @keyframes pulse-red {
+    0%,100% { text-shadow: 0 0 10px rgba(255,45,91,0.5); }
+    50% { text-shadow: 0 0 25px rgba(255,45,91,0.9); }
+  }
+
+  .nav { padding: 8px 0; flex: 1; }
+
+  .nav-section {
+    padding: 8px 16px 4px;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+  }
+
+  .nav-item:hover { background: rgba(0,200,255,0.05); color: var(--text-primary); }
+
+  .nav-item.active {
+    background: rgba(0,200,255,0.08);
+    border-left-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .nav-badge {
+    margin-left: auto;
+    background: var(--accent-red);
+    color: white;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-family: var(--font-mono);
+    animation: blink 1.5s infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  .sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .sys-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: pulse-green 2s infinite;
+  }
+
+  @keyframes pulse-green {
+    0%,100%{opacity:1} 50%{opacity:0.4}
+  }
+
+  /* MAIN */
+  .main {
+    margin-left: 240px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* TOPBAR */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(8,15,24,0.95);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    padding: 0 28px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent-green);
+    padding: 5px 12px;
+    border: 1px solid rgba(0,255,157,0.3);
+    border-radius: 20px;
+    background: rgba(0,255,157,0.05);
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse-green 1s infinite;
+  }
+
+  .time-display {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .btn {
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #0066cc, #0099ff);
+    color: white;
+    box-shadow: 0 0 15px rgba(0,153,255,0.3);
+  }
+
+  .btn-primary:hover { box-shadow: 0 0 25px rgba(0,153,255,0.5); transform: translateY(-1px); }
+
+  .btn-danger {
+    background: rgba(255,45,91,0.15);
+    color: var(--accent-red);
+    border: 1px solid rgba(255,45,91,0.4);
+  }
+
+  /* CONTENT */
+  .content { padding: 28px; flex: 1; }
+
+  /* PAGES */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* STAT CARDS */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .stat-card.blue::before { background: linear-gradient(90deg, transparent, var(--accent-blue), transparent); }
+  .stat-card.red::before { background: linear-gradient(90deg, transparent, var(--accent-red), transparent); }
+  .stat-card.amber::before { background: linear-gradient(90deg, transparent, var(--accent-amber), transparent); }
+  .stat-card.green::before { background: linear-gradient(90deg, transparent, var(--accent-green), transparent); }
+
+  .stat-card:hover { border-color: var(--accent-blue); }
+
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-card.blue .stat-value { color: var(--accent-blue); }
+  .stat-card.red .stat-value { color: var(--accent-red); }
+  .stat-card.amber .stat-value { color: var(--accent-amber); }
+  .stat-card.green .stat-value { color: var(--accent-green); }
+
+  .stat-change {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .stat-change.up { color: var(--accent-red); }
+  .stat-change.down { color: var(--accent-green); }
+
+  .stat-icon {
+    position: absolute;
+    right: 16px; top: 16px;
+    font-size: 28px;
+    opacity: 0.15;
+  }
+
+  /* GRID LAYOUTS */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-col-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* PANEL */
+  .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-card2);
+  }
+
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-body { padding: 20px; }
+
+  /* CHART CONTAINERS */
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* THREAT FEED */
+  .threat-feed { display: flex; flex-direction: column; gap: 0; }
+
+  .threat-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(26,58,92,0.5);
+    transition: background 0.2s;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .threat-item:hover { background: rgba(0,200,255,0.04); }
+  .threat-item:last-child { border-bottom: none; }
+
+  .severity-badge {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  .sev-critical { background: rgba(255,45,91,0.2); color: var(--critical); border: 1px solid rgba(255,45,91,0.4); }
+  .sev-high { background: rgba(255,124,43,0.2); color: var(--high); border: 1px solid rgba(255,124,43,0.4); }
+  .sev-medium { background: rgba(255,184,0,0.2); color: var(--medium); border: 1px solid rgba(255,184,0,0.4); }
+  .sev-low { background: rgba(0,255,157,0.2); color: var(--low); border: 1px solid rgba(0,255,157,0.4); }
+
+  .threat-desc { flex: 1; color: var(--text-secondary); }
+  .threat-desc strong { color: var(--text-primary); display: block; font-size: 12px; margin-bottom: 2px; }
+  .threat-time { color: var(--text-muted); font-size: 10px; white-space: nowrap; }
+
+  /* RISK GAUGE */
+  .risk-gauge-container { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
+
+  .gauge-wrap { position: relative; width: 180px; height: 90px; overflow: hidden; margin-bottom: 16px; }
+
+  .gauge-bg {
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    border: 16px solid var(--bg-card2);
+    position: absolute;
+    top: 0; left: 0;
+    clip-path: inset(0 0 50% 0);
+  }
+
+  .gauge-fill {
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    border: 16px solid transparent;
+    position: absolute;
+    top: 0; left: 0;
+    clip-path: inset(0 0 50% 0);
+    border-top-color: var(--accent-red);
+    border-right-color: var(--accent-red);
+    transform: rotate(var(--rotation, 180deg));
+    transition: transform 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+    filter: drop-shadow(0 0 8px var(--accent-red));
+  }
+
+  .gauge-score {
+    position: absolute;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 800;
+    color: var(--accent-red);
+    line-height: 1;
+  }
+
+  .gauge-label { font-size: 10px; letter-spacing: 3px; color: var(--text-muted); font-family: var(--font-mono); }
+
+  /* PROCESS LIST */
+  .process-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .process-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-card2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .process-name { flex: 1; font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); }
+  .process-pid { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+  .process-bar-wrap { width: 80px; }
+  .process-bar-bg { height: 4px; background: var(--border); border-radius: 2px; }
+  .process-bar-fill { height: 4px; border-radius: 2px; transition: width 0.5s; }
+
+  /* FILE ACTIVITY */
+  .file-ops-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .file-op-card {
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .file-op-num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .file-op-label { font-size: 10px; letter-spacing: 2px; color: var(--text-muted); font-family: var(--font-mono); }
+
+  /* ENTROPY BARS */
+  .entropy-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .entropy-item { display: flex; flex-direction: column; gap: 4px; }
+  .entropy-header { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; }
+  .entropy-file { color: var(--text-secondary); }
+  .entropy-score { color: var(--accent-amber); }
+  .entropy-bar-bg { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .entropy-bar-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+
+  /* ALERTS PAGE */
+  .alert-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    transition: all 0.2s;
+  }
+
+  .filter-btn.active, .filter-btn:hover {
+    background: rgba(0,200,255,0.1);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+
+  .alert-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 140px 100px 100px;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(26,58,92,0.4);
+    font-size: 13px;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+
+  .alert-row:hover { background: rgba(0,200,255,0.03); }
+
+  .alert-row.header {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    background: var(--bg-card2);
+    cursor: default;
+  }
+
+  .alert-row.header:hover { background: var(--bg-card2); }
+
+  .alert-status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+  }
+
+  /* REPORTS */
+  .report-card {
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    margin-bottom: 12px;
+  }
+
+  .report-card:hover { border-color: var(--accent-blue); }
+
+  .report-icon {
+    width: 48px; height: 48px;
+    background: rgba(0,200,255,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .report-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .report-desc { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 8px; }
+  .report-meta { font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono); }
+
+  /* SETTINGS */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .settings-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(26,58,92,0.4);
+    font-size: 13px;
+  }
+
+  .setting-row:last-child { border-bottom: none; }
+
+  .setting-name { color: var(--text-primary); }
+  .setting-desc { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+
+  .toggle {
+    width: 44px; height: 24px;
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+
+  .toggle.on { background: rgba(0,200,255,0.2); border-color: var(--accent-blue); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    top: 2px; left: 2px;
+    transition: all 0.3s;
+  }
+
+  .toggle.on::after { background: var(--accent-blue); left: 22px; box-shadow: 0 0 8px var(--accent-blue); }
+
+  .threshold-input {
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    width: 80px;
+    text-align: right;
+  }
+
+  .threshold-input:focus { outline: none; border-color: var(--accent-blue); }
+
+  /* TERMINAL */
+  .terminal {
+    background: #010a12;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    height: 200px;
+    overflow-y: auto;
+    color: var(--accent-green);
+  }
+
+  .terminal-line { margin-bottom: 4px; opacity: 0; animation: fadeIn 0.3s forwards; }
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  .term-prompt { color: var(--accent-cyan); }
+  .term-warn { color: var(--accent-amber); }
+  .term-err { color: var(--accent-red); }
+  .term-info { color: var(--text-secondary); }
+
+  /* MAP / NETWORK */
+  .network-canvas { width: 100%; height: 240px; position: relative; background: #010a12; border-radius: 8px; overflow: hidden; }
+
+  .network-node {
+    position: absolute;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    border: 2px solid;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .network-node:hover { transform: scale(1.2); }
+
+  .network-node.clean { background: rgba(0,255,157,0.15); border-color: var(--accent-green); color: var(--accent-green); }
+  .network-node.suspect { background: rgba(255,184,0,0.15); border-color: var(--accent-amber); color: var(--accent-amber); }
+  .network-node.infected { background: rgba(255,45,91,0.15); border-color: var(--accent-red); color: var(--accent-red); animation: pulse-node 1s infinite; }
+
+  @keyframes pulse-node {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,45,91,0.4); }
+    50% { box-shadow: 0 0 0 10px rgba(255,45,91,0); }
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-panel); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+
+  /* RESPONSIVE MINI */
+  .mini-stats { display: flex; gap: 20px; }
+  .mini-stat { text-align: center; }
+  .mini-val { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+  .mini-lbl { font-size: 9px; letter-spacing: 2px; color: var(--text-muted); font-family: var(--font-mono); }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    background: rgba(0,200,255,0.1);
+    color: var(--accent-blue);
+    border: 1px solid rgba(0,200,255,0.3);
+  }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div class="logo-text">RansomGuard</div>
+    <div class="logo-sub">Early Warning System</div>
+  </div>
+
+  <div class="threat-level">
+    <div class="threat-label">THREAT LEVEL</div>
+    <div class="threat-value">ELEVATED</div>
+    <div class="threat-label" style="margin-top:4px">Score: 74 / 100</div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-section">MONITOR</div>
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <span class="icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('threats')">
+      <span class="icon">⚠️</span> Threat Monitor
+      <span class="nav-badge">3</span>
+    </div>
+    <div class="nav-item" onclick="showPage('files')">
+      <span class="icon">📁</span> File Activity
+    </div>
+
+    <div class="nav-section">RESPONSE</div>
+    <div class="nav-item" onclick="showPage('alerts')">
+      <span class="icon">🚨</span> Alerts
+      <span class="nav-badge">7</span>
+    </div>
+    <div class="nav-item" onclick="showPage('reports')">
+      <span class="icon">📋</span> Reports
+    </div>
+
+    <div class="nav-section">SYSTEM</div>
+    <div class="nav-item" onclick="showPage('settings')">
+      <span class="icon">⚙️</span> Settings
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sys-status">
+      <span class="status-dot"></span>
+      AGENT RUNNING v2.4.1
+    </div>
+    <div class="sys-status" style="margin-top:6px">
+      <span style="color:var(--text-muted)">⏱</span>
+      Uptime: 14d 6h 22m
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="page-title" id="pageTitle">Dashboard Overview</div>
+    <div class="topbar-right">
+      <div class="live-indicator">
+        <span class="live-dot"></span>
+        LIVE MONITORING
+      </div>
+      <div class="time-display" id="clockDisplay">--:--:--</div>
+      <button class="btn btn-danger" onclick="simulateAttack()">🧪 Simulate Attack</button>
+      <button class="btn btn-primary">↓ Export</button>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- ===== DASHBOARD PAGE ===== -->
+    <div class="page active" id="page-dashboard">
+
+      <!-- Stat Cards -->
+      <div class="stat-grid">
+        <div class="stat-card red">
+          <div class="stat-icon">🚨</div>
+          <div class="stat-label">ACTIVE THREATS</div>
+          <div class="stat-value" id="stat-threats">3</div>
+          <div class="stat-change up">▲ 2 in last hour</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-icon">📁</div>
+          <div class="stat-label">FILES MODIFIED/MIN</div>
+          <div class="stat-value" id="stat-files">847</div>
+          <div class="stat-change up">▲ 340% anomaly</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">🔍</div>
+          <div class="stat-label">PROCESSES WATCHED</div>
+          <div class="stat-value">128</div>
+          <div class="stat-change">→ stable</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-label">FILES PROTECTED</div>
+          <div class="stat-value">2.4M</div>
+          <div class="stat-change down">▼ 0 encrypted</div>
+        </div>
+      </div>
+
+      <!-- Row 1 -->
+      <div class="grid-col-2-1">
+        <!-- Activity Timeline -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">📈 File Modification Rate (24h)</div>
+            <span class="tag">REAL-TIME</span>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap"><canvas id="activityChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Risk Gauge -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">🎯 Risk Score</div>
+          </div>
+          <div class="panel-body">
+            <div class="risk-gauge-container">
+              <div class="gauge-wrap">
+                <div class="gauge-bg"></div>
+                <div class="gauge-fill" id="gaugeArc" style="--rotation: 216deg;"></div>
+                <div class="gauge-score">74</div>
+              </div>
+              <div class="gauge-label">RISK INDEX</div>
+              <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%">
+                <div class="mini-stat">
+                  <div class="mini-val" style="color:var(--accent-red)">3</div>
+                  <div class="mini-lbl">CRITICAL</div>
+                </div>
+                <div class="mini-stat">
+                  <div class="mini-val" style="color:var(--accent-amber)">5</div>
+                  <div class="mini-lbl">WARNINGS</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="grid-2">
+        <!-- Live Threat Feed -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">🔴 Live Threat Feed</div>
+            <span class="tag">LIVE</span>
+          </div>
+          <div class="threat-feed" id="threatFeed">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Suspicious Processes -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">⚙️ Suspicious Processes</div>
+            <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;">Kill All</button>
+          </div>
+          <div class="panel-body">
+            <div class="process-list" id="processList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Terminal + Network Map -->
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">💻 Detection Log</div>
+          </div>
+          <div class="panel-body" style="padding:12px">
+            <div class="terminal" id="terminalLog"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">🌐 Network Nodes</div>
+          </div>
+          <div class="panel-body" style="padding:12px">
+            <div class="network-canvas" id="networkMap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== THREAT MONITOR PAGE ===== -->
+    <div class="page" id="page-threats">
+      <div style="margin-bottom:20px">
+        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-card red">
+            <div class="stat-label">ENCRYPTION ATTEMPTS</div>
+            <div class="stat-value">12</div>
+            <div class="stat-change up">▲ In last 10 min</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-label">ENTROPY ANOMALIES</div>
+            <div class="stat-value">28</div>
+            <div class="stat-change up">▲ High entropy files</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-label">ML CONFIDENCE</div>
+            <div class="stat-value">94%</div>
+            <div class="stat-change">→ Detection accuracy</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">🔒 Entropy Analysis</div></div>
+          <div class="panel-body">
+            <div class="entropy-list" id="entropyList"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">📊 Threat Distribution</div></div>
+          <div class="panel-body">
+            <div class="chart-wrap"><canvas id="threatDistChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-header"><div class="panel-title">🧠 ML Detection Events</div></div>
+        <div class="threat-feed" id="mlFeed"></div>
+      </div>
+    </div>
+
+    <!-- ===== FILE ACTIVITY PAGE ===== -->
+    <div class="page" id="page-files">
+      <div class="file-ops-grid">
+        <div class="file-op-card">
+          <div class="file-op-num" style="color:var(--accent-amber)">1,847</div>
+          <div class="file-op-label">FILES MODIFIED</div>
+        </div>
+        <div class="file-op-card">
+          <div class="file-op-num" style="color:var(--accent-red)">342</div>
+          <div class="file-op-label">FILES RENAMED</div>
+        </div>
+        <div class="file-op-card">
+          <div class="file-op-num" style="color:var(--accent-purple)">89</div>
+          <div class="file-op-label">SHADOW COPIES DELETED</div>
+        </div>
+        <div class="file-op-card">
+          <div class="file-op-num" style="color:var(--accent-blue)">7.2 GB</div>
+          <div class="file-op-label">DATA TOUCHED</div>
+        </div>
+        <div class="file-op-card">
+          <div class="file-op-num" style="color:var(--accent-cyan)">3</div>
+          <div class="file-op-label">EXTENSIONS CHANGED</div>
+        </div>
+        <div class="file-op-card">
+          <div class="file-op-num" style="color:var(--accent-green)">99.2%</div>
+          <div class="file-op-label">FILES INTACT</div>
+        </div>
+      </div>
+
+      <div class="grid-col-2-1">
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">📁 File Operation Timeline</div></div>
+          <div class="panel-body">
+            <div class="chart-wrap" style="height:260px"><canvas id="fileOpsChart"></canvas></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">📂 Extension Analysis</div></div>
+          <div class="panel-body">
+            <div class="chart-wrap"><canvas id="extChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-header"><div class="panel-title">🔍 Suspicious Files Log</div></div>
+        <div class="alert-row header">
+          <div>TIMESTAMP</div>
+          <div>FILE PATH</div>
+          <div>OPERATION</div>
+          <div>ENTROPY</div>
+          <div>STATUS</div>
+        </div>
+        <div id="fileLog"></div>
+      </div>
+    </div>
+
+    <!-- ===== ALERTS PAGE ===== -->
+    <div class="page" id="page-alerts">
+      <div class="alert-filters">
+        <button class="filter-btn active">All (7)</button>
+        <button class="filter-btn">Critical (3)</button>
+        <button class="filter-btn">High (2)</button>
+        <button class="filter-btn">Medium (2)</button>
+        <button class="filter-btn">Resolved (12)</button>
+      </div>
+
+      <div class="panel">
+        <div class="alert-row header">
+          <div>SEVERITY</div>
+          <div>DESCRIPTION</div>
+          <div>SOURCE</div>
+          <div>TIME</div>
+          <div>ACTION</div>
+        </div>
+        <div id="alertsList"></div>
+      </div>
+    </div>
+
+    <!-- ===== REPORTS PAGE ===== -->
+    <div class="page" id="page-reports">
+      <div class="grid-2">
+        <div>
+          <div class="report-card">
+            <div class="report-icon">📊</div>
+            <div>
+              <div class="report-title">Incident Response Report</div>
+              <div class="report-desc">Auto-generated threat summary with full timeline</div>
+              <div class="report-meta">Generated: Today 14:32 · PDF · 2.4 MB</div>
+            </div>
+          </div>
+          <div class="report-card">
+            <div class="report-icon">🔍</div>
+            <div>
+              <div class="report-title">Weekly Threat Analysis</div>
+              <div class="report-desc">ML model performance + detection statistics</div>
+              <div class="report-meta">Generated: Mar 10, 2025 · PDF · 1.8 MB</div>
+            </div>
+          </div>
+          <div class="report-card">
+            <div class="report-icon">📁</div>
+            <div>
+              <div class="report-title">File Activity Audit</div>
+              <div class="report-desc">Complete file operation log with anomaly highlights</div>
+              <div class="report-meta">Generated: Mar 13, 2025 · CSV · 8.1 MB</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">📈 Detection Accuracy</div></div>
+            <div class="panel-body">
+              <div class="chart-wrap" style="height:280px"><canvas id="accuracyChart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS PAGE ===== -->
+    <div class="page" id="page-settings">
+      <div class="settings-grid">
+        <div>
+          <div class="settings-section">
+            <div class="panel-header"><div class="panel-title">🔔 Detection Thresholds</div></div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">File Modification Rate</div>
+                <div class="setting-desc">Trigger alert above X files/min</div>
+              </div>
+              <input class="threshold-input" value="500" type="number">
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Entropy Threshold</div>
+                <div class="setting-desc">Flag files with entropy above</div>
+              </div>
+              <input class="threshold-input" value="7.5" type="number" step="0.1">
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Risk Score Alert</div>
+                <div class="setting-desc">Alert when risk score exceeds</div>
+              </div>
+              <input class="threshold-input" value="70" type="number">
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="panel-header"><div class="panel-title">🧠 ML Engine</div></div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Anomaly Detection</div>
+                <div class="setting-desc">Isolation Forest model</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Behavioral Analysis</div>
+                <div class="setting-desc">LSTM sequence prediction</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Auto-Isolate on Critical</div>
+                <div class="setting-desc">Network isolate infected node</div>
+              </div>
+              <div class="toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="settings-section">
+            <div class="panel-header"><div class="panel-title">🔔 Notifications</div></div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Email Alerts</div>
+                <div class="setting-desc"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="acdfc3cf81d8c9cdc1eccfc3c1dccdc2d582cfc3c1">[email&#160;protected]</a></div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Slack Integration</div>
+                <div class="setting-desc">#security-alerts channel</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">SMS Critical Only</div>
+                <div class="setting-desc">+1 (555) 000-xxxx</div>
+              </div>
+              <div class="toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="panel-header"><div class="panel-title">🛡️ Response Actions</div></div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Process Termination</div>
+                <div class="setting-desc">Auto-kill on critical detection</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Shadow Copy Backup</div>
+                <div class="setting-desc">Protect VSS snapshots</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-name">Honeypot Files</div>
+                <div class="setting-desc">Decoy file detection</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ====== NAVIGATION ======
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const navItems = document.querySelectorAll('.nav-item');
+  const titles = { dashboard: 'Dashboard Overview', threats: 'Threat Monitor', files: 'File Activity', alerts: 'Active Alerts', reports: 'Reports & Analysis', settings: 'System Settings' };
+  document.getElementById('pageTitle').textContent = titles[id] || id;
+  navItems.forEach(item => {
+    if (item.getAttribute('onclick').includes(id)) item.classList.add('active');
+  });
+}
+
+// ====== CLOCK ======
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockDisplay').textContent = now.toTimeString().slice(0,8) + ' UTC+5:30';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ====== DATA ======
+const threats = [
+  { sev: 'critical', sevClass: 'sev-critical', title: 'Mass File Encryption Detected', desc: 'svchost.exe encrypted 342 files in /Users/Finance', time: '14:31:02' },
+  { sev: 'critical', sevClass: 'sev-critical', title: 'Shadow Copies Being Deleted', desc: 'vssadmin.exe called with delete shadows /all', time: '14:30:47' },
+  { sev: 'high', sevClass: 'sev-high', title: 'Entropy Spike: 7.94 bits/byte', desc: 'documents/Q4_report.docx → Q4_report.docx.locked', time: '14:29:11' },
+  { sev: 'high', sevClass: 'sev-high', title: 'Suspicious Process Injection', desc: 'explorer.exe injected into lsass.exe memory', time: '14:28:55' },
+  { sev: 'medium', sevClass: 'sev-medium', title: 'Registry Modification', desc: 'HKLM\\Software\\..\\Run key modified by unknown', time: '14:27:30' },
+  { sev: 'low', sevClass: 'sev-low', title: 'Unusual Network Connection', desc: '192.168.1.45 → 185.220.101.x:443', time: '14:26:18' },
+];
+
+const processes = [
+  { name: 'encryptor_v2.exe', pid: '4821', cpu: 94, color: 'var(--accent-red)' },
+  { name: 'svchost_fake.exe', pid: '3312', cpu: 67, color: 'var(--accent-amber)' },
+  { name: 'powershell.exe', pid: '2988', cpu: 45, color: 'var(--accent-amber)' },
+  { name: 'cmd.exe', pid: '1822', cpu: 22, color: 'var(--accent-blue)' },
+  { name: 'wscript.exe', pid: '0941', cpu: 12, color: 'var(--accent-cyan)' },
+];
+
+const terminalLines = [
+  { cls: 'term-prompt', text: '[14:31:02] >> CRITICAL: Mass encryption event triggered' },
+  { cls: 'term-err', text: '  ✗ 342 files modified in /Users/Finance (60s window)' },
+  { cls: 'term-warn', text: '  ⚠ Entropy score: 7.94 bits/byte (threshold: 7.5)' },
+  { cls: 'term-err', text: '  ✗ ALERT: Shadow copy deletion attempt detected' },
+  { cls: 'term-info', text: '  → Isolating process PID:4821 (encryptor_v2.exe)' },
+  { cls: 'term-prompt', text: '[14:30:47] >> ML Model confidence: 94.2% ransomware match' },
+  { cls: 'term-info', text: '  → Matching pattern: LockBit 3.0 behavior signature' },
+  { cls: '', text: '  → Sending alert to SOC team...' },
+  { cls: 'term-prompt', text: '[14:29:11] >> Honeypot file triggered: /decoy/important.docx' },
+  { cls: 'term-warn', text: '  ⚠ Extension renamed: .docx → .docx.locked' },
+];
+
+const entropyFiles = [
+  { file: '/Finance/Q4_Budget.xlsx', score: 7.94, pct: 99 },
+  { file: '/HR/employees.csv', score: 7.81, pct: 97 },
+  { file: '/Legal/contracts.docx', score: 7.65, pct: 95 },
+  { file: '/Dev/codebase.zip', score: 7.42, pct: 92 },
+  { file: '/Marketing/campaign.pptx', score: 6.98, pct: 87 },
+  { file: '/Desktop/notes.txt', score: 5.23, pct: 65 },
+];
+
+const alertsData = [
+  { sev: 'CRITICAL', sevClass: 'sev-critical', desc: 'Mass encryption: 342 files encrypted in 60s', src: 'FileWatcher', time: '14:31:02', action: 'ISOLATE' },
+  { sev: 'CRITICAL', sevClass: 'sev-critical', desc: 'VSS shadow copies being deleted by vssadmin', src: 'WinAPI Hook', time: '14:30:47', action: 'BLOCK' },
+  { sev: 'CRITICAL', sevClass: 'sev-critical', desc: 'Honeypot file triggered — ransomware confirmed', src: 'Honeypot', time: '14:29:11', action: 'QUARANTINE' },
+  { sev: 'HIGH', sevClass: 'sev-high', desc: 'Entropy anomaly: 7.94 bits/byte in user docs', src: 'ML Engine', time: '14:28:55', action: 'ALERT' },
+  { sev: 'HIGH', sevClass: 'sev-high', desc: 'Process injection into lsass.exe detected', src: 'Proc Monitor', time: '14:27:30', action: 'KILL' },
+  { sev: 'MEDIUM', sevClass: 'sev-medium', desc: 'Bulk file rename: 89 extensions changed to .locked', src: 'FileWatcher', time: '14:26:18', action: 'MONITOR' },
+  { sev: 'MEDIUM', sevClass: 'sev-medium', desc: 'Registry Run key modification by unknown process', src: 'RegMon', time: '14:25:01', action: 'MONITOR' },
+];
+
+const fileLogData = [
+  { time: '14:31:02', path: '/Users/Finance/Q4_Budget.xlsx', op: 'ENCRYPT', entropy: '7.94', status: 'BLOCKED' },
+  { time: '14:30:59', path: '/Users/HR/payroll.xlsx', op: 'RENAME', entropy: '7.81', status: 'BLOCKED' },
+  { time: '14:30:47', path: '/System/vss/shadow_copy_1', op: 'DELETE', entropy: '—', status: 'BLOCKED' },
+  { time: '14:30:12', path: '/Users/Legal/NDA_2024.docx', op: 'WRITE', entropy: '7.65', status: 'FLAGGED' },
+  { time: '14:29:55', path: '/Users/Desktop/honeypot.docx', op: 'MODIFY', entropy: '7.92', status: 'TRIGGERED' },
+  { time: '14:29:11', path: '/Users/Marketing/campaign.pptx', op: 'ENCRYPT', entropy: '6.98', status: 'QUARANTINED' },
+];
+
+// ====== RENDER FUNCTIONS ======
+function renderThreats() {
+  const feed = document.getElementById('threatFeed');
+  threats.forEach((t, i) => {
+    const el = document.createElement('div');
+    el.className = 'threat-item';
+    el.style.animationDelay = (i * 0.1) + 's';
+    el.innerHTML = `
+      <span class="severity-badge ${t.sevClass}">${t.sev.toUpperCase()}</span>
+      <div class="threat-desc">
+        <strong>${t.title}</strong>
+        ${t.desc}
+      </div>
+      <div class="threat-time">${t.time}</div>
+    `;
+    feed.appendChild(el);
+  });
+}
+
+function renderProcesses() {
+  const list = document.getElementById('processList');
+  processes.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'process-item';
+    el.innerHTML = `
+      <span class="process-name">${p.name}</span>
+      <span class="process-pid">PID:${p.pid}</span>
+      <div class="process-bar-wrap">
+        <div class="process-bar-bg">
+          <div class="process-bar-fill" style="width:${p.cpu}%;background:${p.color}"></div>
+        </div>
+      </div>
+      <span style="font-family:var(--font-mono);font-size:11px;color:${p.color}">${p.cpu}%</span>
+      <button class="btn btn-danger" style="padding:3px 8px;font-size:11px">Kill</button>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function renderTerminal() {
+  const term = document.getElementById('terminalLog');
+  terminalLines.forEach((l, i) => {
+    setTimeout(() => {
+      const line = document.createElement('div');
+      line.className = 'terminal-line ' + l.cls;
+      line.textContent = l.text;
+      term.appendChild(line);
+      term.scrollTop = term.scrollHeight;
+    }, i * 200);
+  });
+}
+
+function renderEntropy() {
+  const list = document.getElementById('entropyList');
+  entropyFiles.forEach(f => {
+    const color = f.score > 7.5 ? 'var(--accent-red)' : f.score > 6.5 ? 'var(--accent-amber)' : 'var(--accent-green)';
+    const el = document.createElement('div');
+    el.className = 'entropy-item';
+    el.innerHTML = `
+      <div class="entropy-header">
+        <span class="entropy-file">${f.file}</span>
+        <span class="entropy-score">${f.score}</span>
+      </div>
+      <div class="entropy-bar-bg">
+        <div class="entropy-bar-fill" style="width:${f.pct}%;background:${color}"></div>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function renderAlerts() {
+  const list = document.getElementById('alertsList');
+  alertsData.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'alert-row';
+    const actionColors = { ISOLATE: 'var(--accent-red)', BLOCK: 'var(--accent-red)', QUARANTINE: 'var(--accent-amber)', ALERT: 'var(--accent-amber)', KILL: 'var(--accent-red)', MONITOR: 'var(--accent-blue)' };
+    el.innerHTML = `
+      <span class="severity-badge ${a.sevClass}">${a.sev}</span>
+      <span style="color:var(--text-secondary)">${a.desc}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">${a.src}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">${a.time}</span>
+      <button class="btn" style="padding:4px 10px;font-size:11px;background:rgba(255,45,91,0.1);color:${actionColors[a.action]};border:1px solid ${actionColors[a.action]}44">${a.action}</button>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function renderMLFeed() {
+  const feed = document.getElementById('mlFeed');
+  const events = [
+    { sev: 'critical', sevClass: 'sev-critical', title: 'LockBit 3.0 Behavioral Match — 94.2% confidence', desc: 'LSTM model detected known ransomware execution sequence', time: '14:31:00' },
+    { sev: 'high', sevClass: 'sev-high', title: 'Isolation Forest: Anomaly Score -0.847', desc: 'File access pattern deviates 3.4σ from user baseline', time: '14:29:30' },
+    { sev: 'medium', sevClass: 'sev-medium', title: 'Rule-Based: 89 file extensions renamed in 45s', desc: 'Triggered: EXT_RENAME_BULK_THRESHOLD exceeded', time: '14:28:00' },
+  ];
+  events.forEach(e => {
+    const el = document.createElement('div');
+    el.className = 'threat-item';
+    el.innerHTML = `
+      <span class="severity-badge ${e.sevClass}">${e.sev.toUpperCase()}</span>
+      <div class="threat-desc">
+        <strong>${e.title}</strong>${e.desc}
+      </div>
+      <div class="threat-time">${e.time}</div>
+    `;
+    feed.appendChild(el);
+  });
+}
+
+function renderFileLog() {
+  const log = document.getElementById('fileLog');
+  fileLogData.forEach(f => {
+    const statusColors = { BLOCKED: 'var(--accent-red)', FLAGGED: 'var(--accent-amber)', TRIGGERED: 'var(--accent-purple)', QUARANTINED: 'var(--accent-amber)' };
+    const el = document.createElement('div');
+    el.className = 'alert-row';
+    el.innerHTML = `
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">${f.time}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)">${f.path}</span>
+      <span class="tag">${f.op}</span>
+      <span style="font-family:var(--font-mono);color:var(--accent-amber)">${f.entropy}</span>
+      <span style="font-family:var(--font-mono);font-size:11px;color:${statusColors[f.status]||'var(--text-muted)'}">${f.status}</span>
+    `;
+    log.appendChild(el);
+  });
+}
+
+function renderNetworkMap() {
+  const map = document.getElementById('networkMap');
+  const nodes = [
+    { x: 20, y: 30, type: 'infected', label: '🖥️' },
+    { x: 45, y: 20, type: 'clean', label: '🖥️' },
+    { x: 70, y: 35, type: 'suspect', label: '🖥️' },
+    { x: 30, y: 60, type: 'clean', label: '🖥️' },
+    { x: 55, y: 65, type: 'infected', label: '🖥️' },
+    { x: 80, y: 60, type: 'clean', label: '🖥️' },
+    { x: 15, y: 70, type: 'clean', label: '🖥️' },
+    { x: 90, y: 25, type: 'clean', label: '🖥️' },
+  ];
+  nodes.forEach(n => {
+    const node = document.createElement('div');
+    node.className = `network-node ${n.type}`;
+    node.style.left = n.x + '%';
+    node.style.top = n.y + '%';
+    node.style.transform = 'translate(-50%,-50%)';
+    node.textContent = n.label;
+    node.title = n.type.toUpperCase();
+    map.appendChild(node);
+  });
+
+  // SVG lines
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
+  const lines = [[0,1],[1,2],[0,3],[1,4],[2,5],[3,6],[4,5]];
+  const nodeColors = ['#ff2d5b','#00ff9d','#ffb800','#00ff9d','#ff2d5b','#00ff9d','#00ff9d','#00ff9d'];
+  lines.forEach(([a,b]) => {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', nodes[a].x + '%'); line.setAttribute('y1', nodes[a].y + '%');
+    line.setAttribute('x2', nodes[b].x + '%'); line.setAttribute('y2', nodes[b].y + '%');
+    line.setAttribute('stroke', '#1a3a5c'); line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(line);
+  });
+  map.insertBefore(svg, map.firstChild);
+}
+
+// ====== CHARTS ======
+const chartDefaults = {
+  color: '#7aa8d0',
+  plugins: { legend: { labels: { color: '#7aa8d0', font: { family: 'Share Tech Mono', size: 11 } } } },
+  scales: {
+    x: { grid: { color: '#1a3a5c44' }, ticks: { color: '#3d6a8a', font: { family: 'Share Tech Mono', size: 10 } } },
+    y: { grid: { color: '#1a3a5c44' }, ticks: { color: '#3d6a8a', font: { family: 'Share Tech Mono', size: 10 } } }
+  }
+};
+
+function makeGradient(ctx, color1, color2) {
+  const g = ctx.createLinearGradient(0, 0, 0, 300);
+  g.addColorStop(0, color1); g.addColorStop(1, color2);
+  return g;
+}
+
+function initCharts() {
+  // Activity Chart
+  const actCtx = document.getElementById('activityChart').getContext('2d');
+  const hours = Array.from({length:24},(_,i)=>`${i}:00`);
+  const baseline = hours.map(()=>Math.floor(Math.random()*50+50));
+  baseline[14] = 847; baseline[13] = 420; baseline[12] = 180;
+  new Chart(actCtx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [
+        { label: 'File Ops/min', data: baseline, borderColor: '#00c8ff', backgroundColor: makeGradient(actCtx,'rgba(0,200,255,0.3)','rgba(0,200,255,0)'), fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2 },
+        { label: 'Baseline', data: hours.map(()=>80), borderColor: '#00ff9d44', borderDash: [5,5], fill: false, borderWidth: 1, pointRadius: 0 }
+      ]
+    },
+    options: { ...chartDefaults, responsive: true, maintainAspectRatio: false }
+  });
+
+  // Threat Distribution Donut
+  const tdCtx = document.getElementById('threatDistChart').getContext('2d');
+  new Chart(tdCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Encryption', 'Process Inject', 'Registry Mod', 'Network C2', 'VSS Delete'],
+      datasets: [{ data: [38, 22, 18, 14, 8], backgroundColor: ['#ff2d5b','#ff7c2b','#ffb800','#b86bff','#00c8ff'], borderColor: '#0c1825', borderWidth: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#7aa8d0', font: { family: 'Share Tech Mono', size: 10 }, padding: 12 } } } }
+  });
+
+  // File Ops Chart
+  const foCtx = document.getElementById('fileOpsChart').getContext('2d');
+  new Chart(foCtx, {
+    type: 'bar',
+    data: {
+      labels: ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','14:30'],
+      datasets: [
+        { label: 'Modify', data: [45,52,60,48,70,55,180,847], backgroundColor: 'rgba(255,184,0,0.7)', borderColor: '#ffb800', borderWidth: 1 },
+        { label: 'Rename', data: [5,8,3,12,6,9,45,342], backgroundColor: 'rgba(255,45,91,0.7)', borderColor: '#ff2d5b', borderWidth: 1 },
+        { label: 'Delete', data: [2,3,1,4,2,3,15,89], backgroundColor: 'rgba(184,107,255,0.7)', borderColor: '#b86bff', borderWidth: 1 },
+      ]
+    },
+    options: { ...chartDefaults, responsive: true, maintainAspectRatio: false, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: false }, y: { ...chartDefaults.scales.y } } }
+  });
+
+  // Extension Chart
+  const extCtx = document.getElementById('extChart').getContext('2d');
+  new Chart(extCtx, {
+    type: 'bar',
+    data: {
+      labels: ['.locked','.enc','.crypt','.docx','.xlsx','.pdf'],
+      datasets: [{ data: [342,189,87,0,0,0], backgroundColor: ['#ff2d5b','#ff7c2b','#ffb800','#00ff9d','#00ff9d','#00ff9d'], borderWidth: 0 }]
+    },
+    options: { ...chartDefaults, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, indexAxis: 'y' }
+  });
+
+  // Accuracy Chart
+  const accCtx = document.getElementById('accuracyChart').getContext('2d');
+  new Chart(accCtx, {
+    type: 'radar',
+    data: {
+      labels: ['Encryption','Process Inj.','Registry','Network C2','File Ops','Entropy'],
+      datasets: [
+        { label: 'Detection Rate', data: [96,88,91,79,97,94], borderColor: '#00c8ff', backgroundColor: 'rgba(0,200,255,0.1)', pointBackgroundColor: '#00c8ff', borderWidth: 2 },
+        { label: 'False Positive Rate', data: [4,12,9,21,3,6], borderColor: '#ff2d5b', backgroundColor: 'rgba(255,45,91,0.05)', pointBackgroundColor: '#ff2d5b', borderWidth: 2 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#7aa8d0', font: { family: 'Share Tech Mono', size: 11 } } } }, scales: { r: { grid: { color: '#1a3a5c' }, angleLines: { color: '#1a3a5c' }, pointLabels: { color: '#7aa8d0', font: { family: 'Share Tech Mono', size: 10 } }, ticks: { display: false } } } }
+  });
+}
+
+// ====== SIMULATE ATTACK ======
+function simulateAttack() {
+  document.getElementById('stat-threats').textContent = '7';
+  document.getElementById('stat-files').textContent = '2,341';
+  const feed = document.getElementById('threatFeed');
+  const el = document.createElement('div');
+  el.className = 'threat-item';
+  el.style.background = 'rgba(255,45,91,0.08)';
+  el.innerHTML = `
+    <span class="severity-badge sev-critical">CRITICAL</span>
+    <div class="threat-desc">
+      <strong>🚨 SIMULATION: WannaCry Pattern Detected</strong>
+      EternalBlue exploit detected — SMB port scanning active
+    </div>
+    <div class="threat-time">${new Date().toTimeString().slice(0,8)}</div>
+  `;
+  feed.insertBefore(el, feed.firstChild);
+
+  // Log to terminal
+  const term = document.getElementById('terminalLog');
+  const line = document.createElement('div');
+  line.className = 'terminal-line term-err';
+  line.textContent = `[${new Date().toTimeString().slice(0,8)}] >> SIMULATION: WannaCry pattern — IMMEDIATE RESPONSE REQUIRED`;
+  term.insertBefore(line, term.firstChild);
+}
+
+// ====== LIVE COUNTER UPDATES ======
+setInterval(() => {
+  const filesEl = document.getElementById('stat-files');
+  if (filesEl && document.getElementById('page-dashboard').classList.contains('active')) {
+    const v = parseInt(filesEl.textContent.replace(/,/g,''));
+    filesEl.textContent = (v + Math.floor(Math.random()*20-5)).toLocaleString();
+  }
+}, 3000);
+
+// ====== INIT ======
+document.addEventListener('DOMContentLoaded', () => {
+  renderThreats();
+  renderProcesses();
+  renderTerminal();
+  renderEntropy();
+  renderAlerts();
+  renderMLFeed();
+  renderFileLog();
+  renderNetworkMap();
+  initCharts();
+});
+
+</script>
